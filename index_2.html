@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AQS HR — Управление персоналом</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F5F5F7;color:#1D1D1F;font-size:14px;}
+:root{--purple:#534AB7;--purple-light:#EEEDFE;--purple-mid:#7F77DD;--green:#3B6D11;--green-bg:#EAF3DE;--amber:#854F0B;--amber-bg:#FAEEDA;--red:#A32D2D;--red-bg:#FCEBEB;--blue:#185FA5;--blue-bg:#E6F1FB;--border:#E5E5EA;--text-sec:#6E6E73;--card:#FFFFFF;--bg:#F5F5F7;}
+.app{display:flex;min-height:100vh;}
+/* Sidebar */
+.sidebar{width:220px;background:#fff;border-right:1px solid var(--border);padding:0;position:fixed;top:0;left:0;height:100vh;display:flex;flex-direction:column;z-index:10;}
+.sidebar-header{padding:20px 20px 16px;border-bottom:1px solid var(--border);}
+.sidebar-logo{font-size:16px;font-weight:600;color:#1D1D1F;display:flex;align-items:center;gap:8px;}
+.sidebar-logo span{font-size:20px;}
+.sidebar-sub{font-size:11px;color:var(--text-sec);margin-top:2px;}
+.nav{padding:8px 0;flex:1;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 20px;font-size:13px;color:var(--text-sec);cursor:pointer;border-left:3px solid transparent;transition:all .15s;}
+.nav-item:hover{background:#F5F5F7;color:#1D1D1F;}
+.nav-item.active{background:#F0EFFE;color:var(--purple);border-left-color:var(--purple-mid);font-weight:500;}
+.nav-item .icon{font-size:16px;width:20px;text-align:center;}
+.sidebar-footer{padding:16px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--text-sec);}
+/* Main */
+.main{margin-left:220px;flex:1;padding:24px;}
+.page{display:none;}
+.page.active{display:block;}
+.page-title{font-size:22px;font-weight:600;margin-bottom:20px;color:#1D1D1F;}
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;}
+.stat-label{font-size:11px;color:var(--text-sec);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px;}
+.stat-value{font-size:26px;font-weight:600;color:#1D1D1F;}
+.stat-sub{font-size:11px;color:var(--text-sec);margin-top:2px;}
+/* Card */
+.card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.card-title{font-size:15px;font-weight:600;color:#1D1D1F;}
+/* Buttons */
+.btn{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:#fff;font-size:13px;color:#1D1D1F;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-family:inherit;transition:all .15s;}
+.btn:hover{background:#F5F5F7;}
+.btn-primary{background:var(--purple);color:#fff;border-color:var(--purple);}
+.btn-primary:hover{background:#3C3489;border-color:#3C3489;}
+.btn-sm{padding:5px 12px;font-size:12px;}
+.btn-danger{color:var(--red);border-color:#F09595;}
+.btn-danger:hover{background:var(--red-bg);}
+/* Table */
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:8px 12px;color:var(--text-sec);font-weight:500;border-bottom:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.4px;}
+td{padding:11px 12px;border-bottom:1px solid var(--border);color:#1D1D1F;vertical-align:middle;}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:#FAFAFA;cursor:pointer;}
+/* Badges */
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500;}
+.badge-active{background:var(--green-bg);color:var(--green);}
+.badge-trial{background:var(--amber-bg);color:var(--amber);}
+.badge-fired{background:var(--red-bg);color:var(--red);}
+.badge-new{background:var(--blue-bg);color:var(--blue);}
+.badge-done{background:var(--green-bg);color:var(--green);}
+.badge-pending{background:var(--amber-bg);color:var(--amber);}
+/* Avatar */
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--purple-light);color:var(--purple);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;flex-shrink:0;}
+/* Inputs */
+.input,.select{padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px;color:#1D1D1F;width:100%;font-family:inherit;}
+.input:focus,.select:focus{outline:none;border-color:var(--purple-mid);box-shadow:0 0 0 3px rgba(127,119,221,.12);}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-group{display:flex;flex-direction:column;gap:5px;}
+.form-label{font-size:12px;font-weight:500;color:#1D1D1F;}
+.form-hint{font-size:11px;color:var(--text-sec);}
+/* Search */
+.search-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;}
+.search-bar .input{max-width:240px;}
+/* Modal */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;}
+.modal-overlay.open{display:flex;}
+.modal{background:#fff;border-radius:16px;padding:24px;width:560px;max-width:100%;margin-bottom:40px;box-shadow:0 20px 60px rgba(0,0,0,.15);}
+.modal-title{font-size:17px;font-weight:600;margin-bottom:20px;color:#1D1D1F;}
+.modal-footer{display:flex;justify-content:flex-end;gap:8px;margin-top:20px;padding-top:16px;border-top:1px solid var(--border);}
+/* Doc preview */
+.doc-preview{background:#F5F5F7;border-radius:8px;padding:16px;font-size:12px;line-height:1.8;color:#1D1D1F;max-height:420px;overflow-y:auto;white-space:pre-wrap;font-family:'Courier New',monospace;border:1px solid var(--border);}
+/* Process */
+.process-col{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+.process-card{background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;}
+.process-card-title{font-size:14px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.step{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.step:last-child{border-bottom:none;}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--purple-light);color:var(--purple);font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.step-text{font-size:13px;color:#1D1D1F;line-height:1.5;}
+/* Tabs */
+.tab-bar{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;}
+.tab{padding:8px 16px;font-size:13px;color:var(--text-sec);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab:hover{color:#1D1D1F;}
+.tab.active{color:var(--purple);border-bottom-color:var(--purple-mid);font-weight:500;}
+/* Doc list */
+.doc-item{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+.doc-item:last-child{border-bottom:none;}
+.doc-icon{width:36px;height:36px;border-radius:8px;background:var(--purple-light);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+/* Notify */
+.notify{position:fixed;bottom:24px;right:24px;background:#1D1D1F;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
+.notify.show{opacity:1;}
+/* Empty */
+.empty{text-align:center;padding:40px;color:var(--text-sec);}
+.empty-icon{font-size:40px;margin-bottom:8px;}
+/* Dept bars */
+.dept-bar-row{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.dept-bar-label{width:110px;font-size:13px;color:var(--text-sec);text-align:right;flex-shrink:0;}
+.dept-bar-track{flex:1;background:#F5F5F7;border-radius:4px;height:22px;overflow:hidden;}
+.dept-bar-fill{background:var(--purple-mid);height:100%;border-radius:4px;transition:width .4s;}
+.dept-bar-count{width:24px;font-size:13px;font-weight:600;}
+/* Emp detail */
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:16px;}
+.detail-row{display:flex;flex-direction:column;gap:2px;}
+.detail-label{font-size:11px;color:var(--text-sec);}
+.detail-val{font-weight:500;}
+/* Info box */
+.info-box{background:var(--blue-bg);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--blue);margin-top:14px;display:flex;align-items:center;gap:8px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="sidebar-logo"><span>👥</span> AQS HR</div>
+      <div class="sidebar-sub">Управление персоналом</div>
+    </div>
+    <nav class="nav">
+      <div class="nav-item active" onclick="showPage('employees')"><span class="icon">👤</span> Сотрудники</div>
+      <div class="nav-item" onclick="showPage('documents')"><span class="icon">📄</span> Документы</div>
+      <div class="nav-item" onclick="showPage('processes')"><span class="icon">📋</span> Процессы</div>
+      <div class="nav-item" onclick="showPage('vacations')"><span class="icon">🗓</span> Отпуска</div>
+      <div class="nav-item" onclick="showPage('dashboard')"><span class="icon">📊</span> Аналитика</div>
+    </nav>
+    <div class="sidebar-footer">AQS Limited · БИН 200240900035</div>
+  </aside>
+
+  <main class="main">
+
+    <!-- Сотрудники -->
+    <div class="page active" id="page-employees">
+      <div class="page-title">Сотрудники</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Всего</div><div class="stat-value" id="s-total">0</div></div>
+        <div class="stat-card"><div class="stat-label">Активных</div><div class="stat-value" id="s-active">0</div></div>
+        <div class="stat-card"><div class="stat-label">На испытании</div><div class="stat-value" id="s-trial">0</div></div>
+        <div class="stat-card"><div class="stat-label">Новых за месяц</div><div class="stat-value" id="s-new">0</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">База сотрудников</span>
+          <button class="btn btn-primary" onclick="openModal('add')">+ Добавить сотрудника</button>
+        </div>
+        <div class="search-bar">
+          <input class="input" id="q" placeholder="Поиск по имени или должности..." oninput="render()">
+          <select class="select" id="fst" onchange="render()" style="width:160px;">
+            <option value="">Все статусы</option>
+            <option value="active">Активный</option>
+            <option value="trial">Испытание</option>
+            <option value="fired">Уволен</option>
+          </select>
+          <select class="select" id="fdept" onchange="render()" style="width:160px;">
+            <option value="">Все отделы</option>
+          </select>
+        </div>
+        <table>
+          <thead><tr><th>Сотрудник</th><th>Должность</th><th>Отдел</th><th>Принят</th><th>Статус</th><th></th></tr></thead>
+          <tbody id="emp-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Документы -->
+    <div class="page" id="page-documents">
+      <div class="page-title">Документы</div>
+      <div class="card">
+        <div class="tab-bar">
+          <div class="tab active" onclick="filterDocs('all',this)">Все</div>
+          <div class="tab" onclick="filterDocs('contract',this)">Трудовые договора</div>
+          <div class="tab" onclick="filterDocs('order',this)">Приказы</div>
+          <div class="tab" onclick="filterDocs('nda',this)">Конфиденциальность</div>
+        </div>
+        <div id="doc-list"></div>
+      </div>
+    </div>
+
+    <!-- Процессы -->
+    <div class="page" id="page-processes">
+      <div class="page-title">Процессы</div>
+      <div class="process-col">
+        <div class="process-card">
+          <div class="process-card-title"><span>🟢</span> Приём сотрудника</div>
+          <div class="step"><div class="step-num">1</div><div class="step-text">Оффер и согласование условий</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-text">Сбор документов (паспорт, ИИН, диплом)</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-text">Оформление трудового договора</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-text">Приказ о приёме на работу</div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-text">Соглашение о конфиденциальности</div></div>
+          <div class="step"><div class="step-num">6</div><div class="step-text">Инструктаж и знакомство с командой</div></div>
+          <div class="step"><div class="step-num">7</div><div class="step-text">Выдача доступов и оборудования</div></div>
+        </div>
+        <div class="process-card">
+          <div class="process-card-title"><span>🟡</span> Испытательный срок</div>
+          <div class="step"><div class="step-num">1</div><div class="step-text">Составление плана на испытательный срок</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-text">Проверка через 1 месяц</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-text">Проверка через 2 месяца</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-text">Итоговая оценка</div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-text">Решение: принять / продлить / уволить</div></div>
+        </div>
+        <div class="process-card">
+          <div class="process-card-title"><span>🔴</span> Увольнение</div>
+          <div class="step"><div class="step-num">1</div><div class="step-text">Заявление / уведомление об увольнении</div></div>
+          <div class="step"><div class="step-num">2</div><div class="step-text">Обходной лист (сдача доступов)</div></div>
+          <div class="step"><div class="step-num">3</div><div class="step-text">Приказ об увольнении</div></div>
+          <div class="step"><div class="step-num">4</div><div class="step-text">Расчёт и выплата</div></div>
+          <div class="step"><div class="step-num">5</div><div class="step-text">Возврат имущества и доступов</div></div>
+          <div class="step"><div class="step-num">6</div><div class="step-text">Выдача справок / exit-интервью</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Отпуска -->
+    <div class="page" id="page-vacations">
+      <div class="page-title">Отпуска и отсутствия</div>
+      <div class="card">
+        <table>
+          <thead><tr><th>Сотрудник</th><th>Тип</th><th>С</th><th>По</th><th>Дней</th><th>Статус</th></tr></thead>
+          <tbody id="vac-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Аналитика -->
+    <div class="page" id="page-dashboard">
+      <div class="page-title">Аналитика</div>
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-label">Средний стаж</div><div class="stat-value" id="d-tenure">—</div><div class="stat-sub">лет</div></div>
+        <div class="stat-card"><div class="stat-label">Текучесть</div><div class="stat-value" id="d-turn">—</div><div class="stat-sub">% за всё время</div></div>
+        <div class="stat-card"><div class="stat-label">На испытании</div><div class="stat-value" id="d-trial">—</div></div>
+        <div class="stat-card"><div class="stat-label">Уволено</div><div class="stat-value" id="d-fired">—</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:16px;">Распределение по отделам</div>
+        <div id="dept-chart"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal: добавить сотрудника -->
+<div class="modal-overlay" id="modal-add">
+  <div class="modal">
+    <div class="modal-title">Новый сотрудник</div>
+    <div class="form-grid">
+      <div class="form-group" style="grid-column:1/-1"><label class="form-label">ФИО (полностью) *</label><input class="input" id="f-name" placeholder="Иванов Иван Иванович"></div>
+      <div class="form-group"><label class="form-label">Должность *</label><input class="input" id="f-pos" placeholder="Менеджер"></div>
+      <div class="form-group"><label class="form-label">Отдел *</label><input class="input" id="f-dept" placeholder="Продажи"></div>
+      <div class="form-group"><label class="form-label">Дата найма</label><input class="input" id="f-date" type="date"></div>
+      <div class="form-group"><label class="form-label">Тип договора</label>
+        <select class="select" id="f-ctype"><option value="fixed">Срочный (1 год)</option><option value="unlimited">Бессрочный</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Оклад (тг, после вычетов)</label><input class="input" id="f-salary" type="number" placeholder="500000"></div>
+      <div class="form-group"><label class="form-label">Режим работы</label>
+        <select class="select" id="f-wmode"><option value="shift">Вахтовый</option><option value="office">Офисный</option><option value="remote">Удалённый</option><option value="parttime">По совместительству</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">ИИН</label><input class="input" id="f-iin" placeholder="000000000000" maxlength="12"></div>
+      <div class="form-group"><label class="form-label">Номер уд. личности</label><input class="input" id="f-docnum" placeholder="123456789"></div>
+      <div class="form-group"><label class="form-label">Телефон</label><input class="input" id="f-phone" placeholder="+7 701 000 0000"></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="input" id="f-email" placeholder="email@aqs.kz"></div>
+      <div class="form-group" style="grid-column:1/-1"><label class="form-label">Адрес</label><input class="input" id="f-addr" placeholder="г. Астана, ул. ..."></div>
+      <div class="form-group"><label class="form-label">Статус при найме</label>
+        <select class="select" id="f-status"><option value="trial">Испытательный срок</option><option value="active">Активный</option></select>
+      </div>
+    </div>
+    <div class="info-box">📄 Автоматически сформируются: трудовой договор, приказ о приёме, соглашение о конфиденциальности</div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('add')">Отмена</button>
+      <button class="btn btn-primary" onclick="addEmployee()">✓ Добавить и сформировать документы</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: просмотр сотрудника -->
+<div class="modal-overlay" id="modal-view">
+  <div class="modal" style="width:600px;">
+    <div id="view-content"></div>
+    <div class="modal-footer">
+      <button class="btn btn-danger" id="fire-btn" onclick="fireEmp()">Уволить</button>
+      <button class="btn" onclick="closeModal('view')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: документ -->
+<div class="modal-overlay" id="modal-doc">
+  <div class="modal" style="width:680px;">
+    <div class="modal-title" id="doc-modal-title"></div>
+    <div class="doc-preview" id="doc-modal-content"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('doc')">Закрыть</button>
+      <button class="btn btn-primary" onclick="copyDoc()">📋 Скопировать текст</button>
+    </div>
+  </div>
+</div>
+
+<div class="notify" id="notify"></div>
+
+<script>
+// ── DATA ──────────────────────────────────────────────────────────
+let employees = [
+  {id:1,name:'Айгерим Бекова',pos:'HR-менеджер',dept:'HR',date:'2023-03-15',phone:'+7 701 111 2233',email:'a.bekova@aqs.kz',salary:450000,iin:'890315401234',docnum:'045123456',addr:'г. Астана, ул. Сыганак 14',status:'active',wmode:'office',ctype:'unlimited'},
+  {id:2,name:'Нурлан Сейткали',pos:'Разработчик',dept:'IT',date:'2024-01-10',phone:'+7 702 222 3344',email:'n.seitkali@aqs.kz',salary:700000,iin:'920110450321',docnum:'052987654',addr:'г. Астана, пр. Республики 5',status:'active',wmode:'office',ctype:'unlimited'},
+  {id:3,name:'Дина Жумабекова',pos:'Бухгалтер',dept:'Финансы',date:'2024-11-01',phone:'+7 705 333 4455',email:'d.zhumabekova@aqs.kz',salary:380000,iin:'981101450112',docnum:'058741236',addr:'г. Астана, ул. Кенесары 10',status:'trial',wmode:'office',ctype:'fixed'},
+  {id:4,name:'Асет Нурмагамбетов',pos:'Менеджер продаж',dept:'Продажи',date:'2022-07-20',phone:'+7 707 444 5566',email:'a.nurm@aqs.kz',salary:500000,iin:'880720451023',docnum:'041654321',addr:'г. Астана, мкр. Самал 3',status:'active',wmode:'office',ctype:'unlimited'},
+  {id:5,name:'Камила Ахметова',pos:'Дизайнер',dept:'Маркетинг',date:'2025-02-01',phone:'+7 708 555 6677',email:'k.akhmetova@aqs.kz',salary:420000,iin:'000201450234',docnum:'061234567',addr:'г. Астана, ул. Бейбітшілік 18',status:'trial',wmode:'remote',ctype:'fixed'},
+];
+let docs = [];
+let vacations = [
+  {empId:1,type:'Ежегодный отпуск',from:'2025-07-01',to:'2025-07-28',days:28,status:'Одобрен'},
+  {empId:4,type:'Ежегодный отпуск',from:'2025-08-10',to:'2025-08-24',days:14,status:'На согласовании'},
+  {empId:2,type:'Больничный',from:'2025-06-10',to:'2025-06-14',days:5,status:'Закрыт'},
+];
+let nextId=6, nextDocNum=299, viewId=null, docFilter='all', docPreviewText='';
+
+// ── UTILS ─────────────────────────────────────────────────────────
+const ge=id=>document.getElementById(id);
+const gv=id=>ge(id).value.trim();
+function initials(n){return n.split(' ').map(w=>w[0]||'').slice(0,2).join('');}
+function fmtDate(d){if(!d)return'—';const p=d.split('-');return p[2]+'.'+p[1]+'.'+p[0];}
+function getEmp(id){return employees.find(e=>e.id===id);}
+function wmodeName(m){return{shift:'Вахтовый',office:'Офисный',remote:'Удалённый',parttime:'По совместительству'}[m]||m;}
+function badge(s){
+  if(s==='active')return'<span class="badge badge-active">Активный</span>';
+  if(s==='trial')return'<span class="badge badge-trial">Испытание</span>';
+  if(s==='fired')return'<span class="badge badge-fired">Уволен</span>';
+  return s;
+}
+function notify(msg){const n=ge('notify');n.textContent=msg;n.classList.add('show');setTimeout(()=>n.classList.remove('show'),2500);}
+
+// ── MODALS ────────────────────────────────────────────────────────
+function openModal(id){ge('modal-'+id).classList.add('open');}
+function closeModal(id){ge('modal-'+id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');}));
+
+// ── PAGES ─────────────────────────────────────────────────────────
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  ge('page-'+id).classList.add('active');
+  const idx={employees:0,documents:1,processes:2,vacations:3,dashboard:4}[id];
+  document.querySelectorAll('.nav-item')[idx].classList.add('active');
+  if(id==='documents')renderDocs();
+  if(id==='vacations')renderVacations();
+  if(id==='dashboard')renderDashboard();
+}
+
+// ── EMPLOYEES ─────────────────────────────────────────────────────
+function render(){
+  const q=gv('q').toLowerCase(), st=ge('fst').value, dp=ge('fdept').value;
+  const list=employees.filter(e=>{
+    if(q&&!e.name.toLowerCase().includes(q)&&!e.pos.toLowerCase().includes(q))return false;
+    if(st&&e.status!==st)return false;
+    if(dp&&e.dept!==dp)return false;
+    return true;
+  });
+  ge('emp-tbody').innerHTML=list.length?list.map(e=>`
+    <tr onclick="viewEmp(${e.id})">
+      <td><div style="display:flex;align-items:center;gap:10px;"><div class="avatar">${initials(e.name)}</div><div><div style="font-weight:500;">${e.name}</div><div style="font-size:11px;color:#6E6E73;">${e.email||''}</div></div></div></td>
+      <td>${e.pos}</td><td>${e.dept}</td><td>${fmtDate(e.date)}</td><td>${badge(e.status)}</td>
+      <td><button class="btn btn-sm" onclick="event.stopPropagation();viewEmp(${e.id})">Открыть</button></td>
+    </tr>`).join(''):'<tr><td colspan="6"><div class="empty"><div class="empty-icon">🔍</div>Сотрудники не найдены</div></td></tr>';
+  updateStats();updateDeptFilter();
+}
+
+function updateDeptFilter(){
+  const depts=[...new Set(employees.map(e=>e.dept))].sort();
+  const sel=ge('fdept'), cur=sel.value;
+  sel.innerHTML='<option value="">Все отделы</option>'+depts.map(d=>`<option value="${d}"${d===cur?' selected':''}>${d}</option>`).join('');
+}
+
+function updateStats(){
+  const active=employees.filter(e=>e.status==='active').length;
+  const trial=employees.filter(e=>e.status==='trial').length;
+  const now=new Date(), ma=new Date(now.getFullYear(),now.getMonth()-1,now.getDate());
+  const newC=employees.filter(e=>e.status!=='fired'&&new Date(e.date)>=ma).length;
+  ge('s-total').textContent=employees.filter(e=>e.status!=='fired').length;
+  ge('s-active').textContent=active;
+  ge('s-trial').textContent=trial;
+  ge('s-new').textContent=newC;
+}
+
+function viewEmp(id){
+  viewId=id; const e=getEmp(id);
+  const empDocs=docs.filter(d=>d.empId===id);
+  ge('view-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid #E5E5EA;">
+      <div class="avatar" style="width:48px;height:48px;font-size:16px;">${initials(e.name)}</div>
+      <div><div style="font-size:17px;font-weight:600;">${e.name}</div>
+      <div style="font-size:13px;color:#6E6E73;">${e.pos} · ${e.dept}</div></div>
+      <div style="margin-left:auto;">${badge(e.status)}</div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-row"><span class="detail-label">Дата найма</span><span class="detail-val">${fmtDate(e.date)}</span></div>
+      <div class="detail-row"><span class="detail-label">Оклад (после вычетов)</span><span class="detail-val">${e.salary?e.salary.toLocaleString()+' тг':'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">Телефон</span><span class="detail-val">${e.phone||'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">Email</span><span class="detail-val">${e.email||'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">ИИН</span><span class="detail-val">${e.iin||'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">Уд. личности</span><span class="detail-val">${e.docnum||'—'}</span></div>
+      <div class="detail-row"><span class="detail-label">Режим работы</span><span class="detail-val">${wmodeName(e.wmode)}</span></div>
+      <div class="detail-row"><span class="detail-label">Тип договора</span><span class="detail-val">${e.ctype==='fixed'?'Срочный (1 год)':'Бессрочный'}</span></div>
+      ${e.addr?`<div class="detail-row" style="grid-column:1/-1"><span class="detail-label">Адрес</span><span class="detail-val">${e.addr}</span></div>`:''}
+    </div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Документы (${empDocs.length})</div>
+    ${empDocs.length?empDocs.map(d=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid #E5E5EA;">
+        <div><div style="font-size:13px;font-weight:500;">${d.name}</div><div style="font-size:11px;color:#6E6E73;">${fmtDate(d.date)}</div></div>
+        <button class="btn btn-sm" onclick="closeModal('view');openDoc(${d.id})">Открыть</button>
+      </div>`).join(''):'<div style="font-size:13px;color:#6E6E73;">Нет документов</div>'}
+  `;
+  ge('fire-btn').style.display=e.status==='fired'?'none':'';
+  openModal('view');
+}
+
+function fireEmp(){
+  const e=getEmp(viewId); if(!e)return;
+  e.status='fired'; closeModal('view'); render(); notify('Сотрудник уволен');
+}
+
+// ── ADD EMPLOYEE ──────────────────────────────────────────────────
+function addEmployee(){
+  const name=gv('f-name'), pos=gv('f-pos'), dept=gv('f-dept');
+  if(!name||!pos||!dept){notify('Заполните обязательные поля (ФИО, должность, отдел)');return;}
+  const e={
+    id:nextId++, name, pos, dept,
+    date:gv('f-date')||new Date().toISOString().split('T')[0],
+    salary:parseInt(ge('f-salary').value)||0,
+    iin:gv('f-iin'), docnum:gv('f-docnum'),
+    phone:gv('f-phone'), email:gv('f-email'), addr:gv('f-addr'),
+    status:ge('f-status').value, wmode:ge('f-wmode').value, ctype:ge('f-ctype').value,
+  };
+  employees.push(e);
+  const dn=nextDocNum++, ds=fmtDate(e.date);
+  docs.push({id:docs.length+1,name:'Трудовой договор №'+dn,type:'contract',empId:e.id,date:e.date,content:genContract(e,dn,ds)});
+  docs.push({id:docs.length+1,name:'Приказ о приёме №П-'+dn,type:'order',empId:e.id,date:e.date,content:genOrder(e,dn,ds)});
+  docs.push({id:docs.length+1,name:'Соглашение о конфиденциальности №'+dn,type:'nda',empId:e.id,date:e.date,content:genNDA(e,dn,ds)});
+  ['f-name','f-pos','f-dept','f-date','f-salary','f-iin','f-docnum','f-phone','f-email','f-addr'].forEach(id=>{const el=ge(id);if(el)el.value='';});
+  closeModal('add'); render(); notify('Сотрудник добавлен, документы сформированы ✓');
+}
+
+// ── DOC GENERATORS ────────────────────────────────────────────────
+function n2w(n){
+  if(!n||isNaN(n))return'';
+  const ones=['','одна','две','три','четыре','пять','шесть','семь','восемь','девять','десять','одиннадцать','двенадцать','тринадцать','четырнадцать','пятнадцать','шестнадцать','семнадцать','восемнадцать','девятнадцать'];
+  const tens=['','','двадцать','тридцать','сорок','пятьдесят','шестьдесят','семьдесят','восемьдесят','девяносто'];
+  const h=['','сто','двести','триста','четыреста','пятьсот','шестьсот','семьсот','восемьсот','девятьсот'];
+  if(n>=1000000){const m=Math.floor(n/1000000),r=n%1000000;const ms=m%10;return(m<20?ones[m]:tens[Math.floor(m/10)]+(ms?' '+ones[ms]:'')).trim()+' '+(m%100>=11&&m%100<=19?'миллионов':ms===1?'миллион':ms>=2&&ms<=4?'миллиона':'миллионов')+' '+n2w(r);}
+  if(n>=1000){const t=Math.floor(n/1000),r=n%1000;const ts=t%10;const tw=(t<20?ones[t]:tens[Math.floor(t/10)]+(ts?' '+ones[ts]:'')).trim();return tw+' '+(t%100>=11&&t%100<=19?'тысяч':ts===1?'тысяча':ts>=2&&ts<=4?'тысячи':'тысяч')+' '+n2w(r);}
+  const hv=Math.floor(n/100),rem=n%100,tv=Math.floor(rem/10),ov=rem%10;
+  return((hv?h[hv]+' ':'')+(rem<20?ones[rem]:(tens[tv]+(ov?' '+ones[ov]:'')))).trim();
+}
+
+function endDate(start,ctype){
+  if(ctype!=='fixed')return'';
+  const d=new Date(start); d.setFullYear(d.getFullYear()+1); return fmtDate(d.toISOString().split('T')[0]);
+}
+
+function genContract(e,dn,ds){
+  const ed=endDate(e.date,e.ctype);
+  const durText=e.ctype==='fixed'?`Настоящий трудовой договор является срочным и заключён с ${ds} по ${ed}.`:`Настоящий трудовой договор является бессрочным и заключён с ${ds}.`;
+  const wt=e.wmode==='shift'?'вахтовый метод работы (продолжительность вахты 15 календарных дней)':'стандартный режим работы';
+  const sw=n2w(e.salary);
+  return `ТРУДОВОЙ ДОГОВОР № ${dn}
+
+г. Астана                                                    ${ds}
+
+Частная компания AQS Limited, зарегистрированное и действующее в соответствии с законодательством Международного финансового центра «Астана» (МФЦА) Республики Казахстан, в лице Директора г-на Онгарова Алихана Ерболовича, действующего на основании Устава, БИН: 200240900035, юридический адрес: Республика Казахстан, г. Астана, Есильский район, улица Дінмұхамед Қонаев, дом 12/1, далее именуемое «Работодатель», с одной стороны, и
+
+Гражданин(-ка) Республики Казахстан ${e.name}, удостоверение личности №${e.docnum||'__________'}, ИИН ${e.iin||'__________'}, адрес: ${e.addr||'__________'}, далее именуемый «Работник», с другой стороны, заключили настоящий Трудовой договор о нижеследующем:
+
+1. ПРЕДМЕТ ДОГОВОРА
+1.1. Работник обязуется лично выполнять работу в должности ${e.pos}${e.wmode==='parttime'?' по совместительству':''}, соблюдать правила трудового распорядка и акты Работодателя, а Работодатель обеспечивает условия труда, своевременно и в полном объеме выплачивает Работнику заработную плату.
+1.2. ${durText}
+
+2. ОБЯЗАННОСТИ РАБОТНИКА
+2.1. Выполнять трудовые обязанности в соответствии с Договором и приложениями к нему, а также локальными актами Работодателя.
+2.2. Соблюдать трудовую дисциплину.
+2.3. Соблюдать требования по безопасности и охране труда, пожарной безопасности.
+2.4. Бережно относиться к имуществу Работодателя.
+2.5. Незамедлительно сообщать Работодателю о возникшей ситуации, представляющей угрозу жизни и здоровью людей.
+2.6. Не разглашать сведения, составляющих государственные секреты, служебную, коммерческую или иную охраняемую законом тайну.
+
+3. ОПЛАТА ТРУДА
+3.1. Работнику устанавливается должностной оклад, размер которого после обязательных вычетов (обязательных пенсионных взносов, налогов и других обязательных платежей в бюджет) составляет ${e.salary?e.salary.toLocaleString()+' ('+sw+') тенге':'___________ тенге'}.
+3.2. Заработная плата выплачивается в денежной форме: ежемесячно, не позднее 10 (десятого) числа месяца.
+
+4. РЕЖИМ РАБОЧЕГО ВРЕМЕНИ
+4.1. Работнику устанавливается ${wt}.
+
+5. ОТПУСК
+5.1. Работнику предоставляется ежегодный оплачиваемый отпуск продолжительностью 20 (двадцать) рабочих дней за календарный год.
+5.2. Праздничные дни установлены согласно законодательству Республики Казахстан.
+
+6. КОНФИДЕНЦИАЛЬНОСТЬ
+6.1. Работник обязуется соблюдать полную конфиденциальность в отношении всей информации, составляющей коммерческую тайну Работодателя, и не раскрывать такую информацию третьим лицам.
+
+7. ПРЕКРАЩЕНИЕ ДОГОВОРА
+7.1. Договор может быть расторгнут по соглашению сторон, по инициативе одной из сторон в соответствии с Правилами МФЦА и законодательством РК.
+7.2. Работник вправе расторгнуть Договор, предупредив Работодателя письменно не менее чем за 30 (тридцать) дней при стаже до 5 лет, или за 90 (девяносто) дней при стаже 5 лет и более.
+
+8. ПРИМЕНИМОЕ ПРАВО
+8.1. Действительность, толкование и исполнение Договора регулируются Правилами МФЦА, а в части неурегулированного — законодательством Республики Казахстан.
+
+14.3. Настоящий Договор составлен в 2 (двух) экземплярах на русском языке. Один экземпляр хранится у Работодателя, второй — у Работника.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ПОДПИСИ СТОРОН
+
+РАБОТОДАТЕЛЬ:                          РАБОТНИК:
+Частная компания AQS Limited           ${e.name}
+БИН: 200240900035
+Директор: Онгаров А.Е.
+
+______________________________         ______________________________
+   (подпись, печать)                         (подпись)`;
+}
+
+function genOrder(e,dn,ds){
+  return `ПРИКАЗ О ПРИЁМЕ НА РАБОТУ № П-${dn}
+
+Частная компания AQS Limited (БИН 200240900035)
+г. Астана                                        ${ds}
+
+─────────────────────────────────────────────────────────────
+
+П Р И К А З Ы В А Ю:
+
+Принять на работу:
+
+  ФИО:              ${e.name}
+  Должность:        ${e.pos}
+  Отдел:            ${e.dept}
+  Дата приёма:      ${ds}
+  Оклад:            ${e.salary?e.salary.toLocaleString()+' тг (после обязательных вычетов)':'___________'}
+  Режим работы:     ${wmodeName(e.wmode)}
+  ИИН:              ${e.iin||'___________'}
+  Статус:           ${e.status==='trial'?'Испытательный срок (3 месяца)':'Постоянная основа'}
+
+─────────────────────────────────────────────────────────────
+
+Основание: Трудовой договор № ${dn} от ${ds}
+
+Директор AQS Limited: _________________________ / Онгаров А.Е.
+
+Работник ознакомлен(-а): _______________________ / ${e.name}
+
+Дата: _______________________`;
+}
+
+function genNDA(e,dn,ds){
+  return `СОГЛАШЕНИЕ О КОНФИДЕНЦИАЛЬНОСТИ И НЕРАЗГЛАШЕНИИ ИНФОРМАЦИИ
+Приложение № 1 к Трудовому договору № ${dn} от ${ds}
+
+г. Астана                                        ${ds}
+
+Частная компания «AQS Limited», БИН 200240900035, в лице Директора Онгарова Алихана Ерболовича, именуемый в дальнейшем «Работодатель», с одной стороны, и
+
+Гражданин(-ка) Республики Казахстан ${e.name}, ИИН ${e.iin||'___________'}, именуемый(-ая) в дальнейшем «Работник», с другой стороны, заключили настоящее Соглашение о нижеследующем:
+
+1. ОБЩИЕ ПОЛОЖЕНИЯ
+1.1. Работник обязуется использовать конфиденциальную информацию только в связи с исполнением трудовых обязанностей и только в интересах Работодателя.
+1.2. Работник обязуется не разглашать третьим лицам конфиденциальную информацию, которая станет ему известной в связи с исполнением трудовых обязанностей и/или в течение трудовых отношений.
+
+2. КОНФИДЕНЦИАЛЬНАЯ ИНФОРМАЦИЯ
+2.1. К конфиденциальной информации относятся: коммерческая тайна, персональные данные сотрудников и клиентов, геологические данные, финансовая информация, стратегические планы, базы данных, внутренняя документация, условия договорных взаимоотношений с клиентами и партнёрами.
+2.2. Конфиденциальной информацией не является информация, являющаяся общедоступной или ставшая таковой вне зависимости от действий Сторон.
+
+3. ОБЯЗАТЕЛЬСТВА РАБОТНИКА
+3.1. Не передавать конфиденциальную информацию третьим лицам без письменного согласия Работодателя.
+3.2. Принять все разумные меры для предотвращения несанкционированного доступа к конфиденциальной информации.
+3.3. Незамедлительно сообщать Работодателю о попытках третьих лиц получить доступ к конфиденциальной информации.
+3.4. При прекращении трудовых отношений вернуть все носители с конфиденциальной информацией Работодателю.
+3.5. Не хранить и не передавать конфиденциальную информацию посредством незащищённых каналов связи, личной электронной почты, социальных сетей.
+
+4. СРОК ДЕЙСТВИЯ
+4.1. Настоящее соглашение действует в течение всего срока трудовых отношений и в течение 3 (трёх) лет после их прекращения по любому основанию.
+
+5. ОТВЕТСТВЕННОСТЬ
+5.1. В случае нарушения условий настоящего Соглашения Работник несёт ответственность в соответствии с гражданским и уголовным законодательством Республики Казахстан.
+5.2. Разглашение Работником конфиденциальной информации расценивается как грубое нарушение трудовых обязанностей и может повлечь расторжение Трудового договора по инициативе Работодателя.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ПОДПИСИ СТОРОН
+
+РАБОТОДАТЕЛЬ:                          РАБОТНИК:
+Директор AQS Limited
+Онгаров А.Е.
+
+______________________________         ______________________________
+   (подпись, печать)                   ${e.name} (подпись)`;
+}
+
+// ── DOCUMENTS ─────────────────────────────────────────────────────
+function renderDocs(){
+  const list=docFilter==='all'?docs:docs.filter(d=>d.type===docFilter);
+  const el=ge('doc-list');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">📄</div>Документов нет</div>';return;}
+  const icons={contract:'📝',order:'📋',nda:'🔒'};
+  const labels={contract:'Трудовой договор',order:'Приказ',nda:'Конфиденциальность'};
+  el.innerHTML=list.map(d=>{
+    const emp=getEmp(d.empId);
+    return`<div class="doc-item">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="doc-icon">${icons[d.type]||'📄'}</div>
+        <div><div style="font-size:14px;font-weight:500;">${d.name}</div>
+        <div style="font-size:12px;color:#6E6E73;">${labels[d.type]||''} · ${emp?emp.name:'—'} · ${fmtDate(d.date)}</div></div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="badge badge-done">Сформирован</span>
+        <button class="btn btn-sm" onclick="openDoc(${d.id})">Открыть</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function filterDocs(f,el){
+  docFilter=f;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderDocs();
+}
+
+function openDoc(id){
+  const d=docs.find(x=>x.id===id); if(!d)return;
+  ge('doc-modal-title').textContent=d.name;
+  ge('doc-modal-content').textContent=d.content;
+  docPreviewText=d.content;
+  openModal('doc');
+}
+
+function copyDoc(){
+  navigator.clipboard.writeText(docPreviewText).then(()=>notify('Скопировано ✓')).catch(()=>notify('Не удалось скопировать'));
+}
+
+// ── VACATIONS ─────────────────────────────────────────────────────
+function renderVacations(){
+  ge('vac-tbody').innerHTML=vacations.map(v=>{
+    const emp=getEmp(v.empId);
+    const sc=v.status==='Одобрен'?'badge-active':v.status==='Закрыт'?'badge-fired':'badge-trial';
+    return`<tr><td>${emp?emp.name:'—'}</td><td>${v.type}</td><td>${fmtDate(v.from)}</td><td>${fmtDate(v.to)}</td><td>${v.days}</td><td><span class="badge ${sc}">${v.status}</span></td></tr>`;
+  }).join('')||'<tr><td colspan="6"><div class="empty">Нет данных</div></td></tr>';
+}
+
+// ── DASHBOARD ─────────────────────────────────────────────────────
+function renderDashboard(){
+  const fired=employees.filter(e=>e.status==='fired').length;
+  const trial=employees.filter(e=>e.status==='trial').length;
+  ge('d-fired').textContent=fired;
+  ge('d-trial').textContent=trial;
+  ge('d-turn').textContent=employees.length?Math.round(fired/employees.length*100)+'%':'0%';
+  const now=new Date();
+  const tenures=employees.filter(e=>e.status!=='fired').map(e=>(now-new Date(e.date))/(1000*60*60*24*365));
+  ge('d-tenure').textContent=tenures.length?(tenures.reduce((a,b)=>a+b,0)/tenures.length).toFixed(1):'—';
+  const depts={};
+  employees.filter(e=>e.status!=='fired').forEach(e=>{depts[e.dept]=(depts[e.dept]||0)+1;});
+  const max=Math.max(...Object.values(depts),1);
+  ge('dept-chart').innerHTML=Object.entries(depts).sort((a,b)=>b[1]-a[1]).map(([d,c])=>`
+    <div class="dept-bar-row">
+      <div class="dept-bar-label">${d}</div>
+      <div class="dept-bar-track"><div class="dept-bar-fill" style="width:${Math.round(c/max*100)}%"></div></div>
+      <div class="dept-bar-count">${c}</div>
+    </div>`).join('');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+ge('f-date').value=new Date().toISOString().split('T')[0];
+render();
+</script>
+</body>
+</html>
