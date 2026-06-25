@@ -8,10 +8,11 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - name: Install requests
+        run: pip install requests
       - name: Check birthdays
-        run: |
-          python3 birthday.py
+        run: python3 birthday.py
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
